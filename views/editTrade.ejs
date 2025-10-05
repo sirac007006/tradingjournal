@@ -268,7 +268,7 @@
                 </div>
             <% } %>
 
-            <form action="/trades/edit/<%= trade.id %>" method="POST">
+            <form action="/trades/edit/<%= trade.id %>" method="POST" enctype="multipart/form-data">
                 <div class="form-row">
                     <div class="form-group">
                         <label for="pair">Trading Pair <span class="required">*</span></label>

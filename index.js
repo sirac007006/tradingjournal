@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import pkg from 'pg';
 import bcrypt from 'bcrypt';
+import multer from 'multer';
+import fs from 'fs';
 
 const { Pool } = pkg;
 
