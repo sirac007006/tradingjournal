@@ -41,6 +41,38 @@ pool.query('SELECT NOW()', (err, res) => {
   }
 });
 
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Multer configuration for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'trade-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  // Accept images only
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed!'), false);
+  }
+};
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
 // View engine setup
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -318,39 +350,59 @@ app.get('/trades/add', isAuthenticated, (req, res) => {
 });
 
 // POST - Create new trade
-app.post('/trades/add', isAuthenticated, async (req, res) => {
-  const { pair, position, entry_price, exit_price, profit_loss, comment, trade_date } = req.body;
-
-  try {
-    if (!pair || !position) {
+app.post('/trades/add', isAuthenticated, (req, res, next) => {
+  upload.single('image')(req, res, async (err) => {
+    if (err) {
+      console.error('Upload error:', err);
       return res.render('addTrade', {
         title: 'Add Trade',
-        error: 'Pair and position are required'
+        error: 'Failed to upload image: ' + err.message
       });
     }
 
-    await pool.query(
-      'INSERT INTO trades (user_id, pair, position, entry_price, exit_price, profit_loss, comment, trade_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-      [
-        req.session.user.id,
-        pair,
-        position,
-        entry_price || null,
-        exit_price || null,
-        profit_loss || null,
-        comment || null,
-        trade_date || new Date()
-      ]
-    );
+    const { pair, position, entry_price, exit_price, profit_loss, comment, trade_date } = req.body;
+    const imagePath = req.file ? '/uploads/' + req.file.filename : null;
 
-    res.redirect('/journal');
-  } catch (error) {
-    console.error('Add trade error:', error);
-    res.render('addTrade', {
-      title: 'Add Trade',
-      error: 'Failed to add trade. Please try again.'
-    });
-  }
+    try {
+      if (!pair || !position) {
+        // Delete uploaded file if validation fails
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res.render('addTrade', {
+          title: 'Add Trade',
+          error: 'Pair and position are required'
+        });
+      }
+
+      await pool.query(
+        'INSERT INTO trades (user_id, pair, position, entry_price, exit_price, profit_loss, comment, trade_date, image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+        [
+          req.session.user.id,
+          pair,
+          position,
+          entry_price || null,
+          exit_price || null,
+          profit_loss || null,
+          comment || null,
+          trade_date || new Date(),
+          imagePath
+        ]
+      );
+
+      res.redirect('/journal');
+    } catch (error) {
+      console.error('Add trade error:', error);
+      // Delete uploaded file if database insert fails
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.render('addTrade', {
+        title: 'Add Trade',
+        error: 'Failed to add trade. Please try again.'
+      });
+    }
+  });
 });
 
 // ============================================
@@ -385,11 +437,15 @@ app.get('/trades/edit/:id', isAuthenticated, async (req, res) => {
 });
 
 // POST - Update trade
-app.post('/trades/edit/:id', isAuthenticated, async (req, res) => {
-  const { pair, position, entry_price, exit_price, profit_loss, comment, trade_date } = req.body;
+app.post('/trades/edit/:id', isAuthenticated, upload.single('image'), async (req, res) => {
+  const { pair, position, entry_price, exit_price, profit_loss, comment, trade_date, remove_image } = req.body;
+  const newImagePath = req.file ? '/uploads/' + req.file.filename : null;
 
   try {
     if (!pair || !position) {
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
       const trade = { id: req.params.id, ...req.body };
       return res.render('editTrade', {
         title: 'Edit Trade',
@@ -398,8 +454,37 @@ app.post('/trades/edit/:id', isAuthenticated, async (req, res) => {
       });
     }
 
+    // Get existing trade to handle old image
+    const existingTrade = await pool.query(
+      'SELECT image_url FROM trades WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.session.user.id]
+    );
+
+    let finalImagePath = existingTrade.rows[0]?.image_url;
+
+    // Handle image removal
+    if (remove_image === 'true' && finalImagePath) {
+      const oldImagePath = path.join(__dirname, 'public', finalImagePath);
+      if (fs.existsSync(oldImagePath)) {
+        fs.unlinkSync(oldImagePath);
+      }
+      finalImagePath = null;
+    }
+
+    // Handle new image upload
+    if (newImagePath) {
+      // Delete old image if exists
+      if (finalImagePath) {
+        const oldImagePath = path.join(__dirname, 'public', finalImagePath);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+      finalImagePath = newImagePath;
+    }
+
     const result = await pool.query(
-      'UPDATE trades SET pair = $1, position = $2, entry_price = $3, exit_price = $4, profit_loss = $5, comment = $6, trade_date = $7 WHERE id = $8 AND user_id = $9',
+      'UPDATE trades SET pair = $1, position = $2, entry_price = $3, exit_price = $4, profit_loss = $5, comment = $6, trade_date = $7, image_url = $8 WHERE id = $9 AND user_id = $10',
       [
         pair,
         position,
@@ -408,18 +493,25 @@ app.post('/trades/edit/:id', isAuthenticated, async (req, res) => {
         profit_loss || null,
         comment || null,
         trade_date || new Date(),
+        finalImagePath,
         req.params.id,
         req.session.user.id
       ]
     );
 
     if (result.rowCount === 0) {
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
       return res.redirect('/journal');
     }
 
     res.redirect('/journal');
   } catch (error) {
     console.error('Update trade error:', error);
+    if (req.file) {
+      fs.unlinkSync(req.file.path);
+    }
     const trade = { id: req.params.id, ...req.body };
     res.render('editTrade', {
       title: 'Edit Trade',
@@ -435,6 +527,21 @@ app.post('/trades/edit/:id', isAuthenticated, async (req, res) => {
 
 app.post('/trades/delete/:id', isAuthenticated, async (req, res) => {
   try {
+    // Get trade to find image
+    const trade = await pool.query(
+      'SELECT image_url FROM trades WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.session.user.id]
+    );
+
+    // Delete image file if exists
+    if (trade.rows[0]?.image_url) {
+      const imagePath = path.join(__dirname, 'public', trade.rows[0].image_url);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+
+    // Delete trade from database
     await pool.query(
       'DELETE FROM trades WHERE id = $1 AND user_id = $2',
       [req.params.id, req.session.user.id]

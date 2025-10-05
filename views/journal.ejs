@@ -440,16 +440,16 @@
                                 <td class="<%= trade.position.toLowerCase() === 'long' ? 'position-long' : 'position-short' %>">
                                     <%= trade.position.toUpperCase() %>
                                 </td>
-                                <td>$<%= trade.entry_price || '-' %></td>
-                                <td>$<%= trade.exit_price || '-' %></td>
+                                <td>$<%= trade.entry_price ? parseFloat(trade.entry_price).toFixed(5) : '-' %></td>
+                                <td>$<%= trade.exit_price ? parseFloat(trade.exit_price).toFixed(5) : '-' %></td>
                                 <td class="<%= parseFloat(trade.profit_loss) > 0 ? 'profit' : 'loss' %>">
-                                    $<%= trade.profit_loss || '0.00' %>
+                                    $<%= trade.profit_loss ? parseFloat(trade.profit_loss).toFixed(5) : '0.00000' %>
                                 </td>
                                 <td>
                                     <% if (trade.image_url) { %>
-                                        <a href="<%= trade.image_url %>" target="_blank" style="color: #4a9eff; text-decoration: none;">
+                                        <span class="image-link" onclick="openModal('<%= trade.image_url %>')">
                                             📷 View
-                                        </a>
+                                        </span>
                                     <% } else { %>
                                         <span style="color: #666;">-</span>
                                     <% } %>
@@ -469,6 +469,12 @@
                 </table>
             <% } %>
         </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="modal" onclick="closeModal()">
+        <span class="modal-close">&times;</span>
+        <img class="modal-content" id="modalImage">
     </div>
 
     <!-- Chart.js Script -->
@@ -553,5 +559,31 @@
         });
     </script>
     <% } %>
+
+    <script>
+        // Image modal functions
+        function openModal(imageSrc) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.style.display = 'block';
+            modalImg.src = imageSrc;
+            
+            // Prevent body scroll when modal is open
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('imageModal');
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close modal on ESC key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
 </body>
 </html>

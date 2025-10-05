@@ -141,6 +141,19 @@
 
         input[type="file"] {
             cursor: pointer;
+            width: 100%;
+            padding: 12px 15px;
+            background: #252525;
+            border: 2px dashed #333;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #e0e0e0;
+            transition: all 0.3s;
+        }
+
+        input[type="file"]:hover {
+            border-color: #4a9eff;
+            background: #2a2a2a;
         }
 
         input[type="file"]::file-selector-button {
@@ -295,8 +308,8 @@
                             type="number" 
                             id="entry_price" 
                             name="entry_price" 
-                            step="0.01"
-                            placeholder="0.00"
+                            step="0.00001"
+                            placeholder="0.00000"
                         >
                         <div class="info-text">Price at which you entered the trade</div>
                     </div>
@@ -307,8 +320,8 @@
                             type="number" 
                             id="exit_price" 
                             name="exit_price" 
-                            step="0.01"
-                            placeholder="0.00"
+                            step="0.00001"
+                            placeholder="0.00000"
                         >
                         <div class="info-text">Price at which you exited the trade</div>
                     </div>
@@ -378,6 +391,40 @@
     <script>
         // Set default date to today
         document.getElementById('trade_date').valueAsDate = new Date();
+
+        // Image preview function
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                // Check file size (5MB limit)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('File size must be less than 5MB');
+                    event.target.value = '';
+                    return;
+                }
+
+                // Check file type
+                if (!file.type.startsWith('image/')) {
+                    alert('Please select an image file');
+                    event.target.value = '';
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('preview').src = e.target.result;
+                    document.getElementById('imagePreview').style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Remove preview
+        function removePreview() {
+            document.getElementById('image').value = '';
+            document.getElementById('imagePreview').style.display = 'none';
+            document.getElementById('preview').src = '';
+        }
     </script>
 </body>
 </html>
