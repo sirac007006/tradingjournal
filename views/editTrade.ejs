@@ -139,6 +139,25 @@
             color: #666;
         }
 
+        input[type="file"] {
+            cursor: pointer;
+        }
+
+        input[type="file"]::file-selector-button {
+            background: #4a9eff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-weight: 600;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            background: #3a8eef;
+        }
+
         select {
             cursor: pointer;
         }
@@ -353,6 +372,47 @@
                         name="comment"
                         placeholder="Add any notes about this trade (strategy, market conditions, lessons learned, etc.)"
                     ><%= trade.comment || '' %></textarea>
+                </div>
+
+                <!-- Current Image Display -->
+                <% if (trade.image_url) { %>
+                <div class="form-group">
+                    <label>Current Image</label>
+                    <div class="current-image-container" style="position: relative; display: inline-block;">
+                        <img src="<%= trade.image_url %>" alt="Trade screenshot" style="max-width: 100%; max-height: 300px; border-radius: 6px; border: 1px solid #333; display: block;">
+                        <a href="<%= trade.image_url %>" target="_blank" style="display: inline-block; margin-top: 10px; color: #4a9eff; text-decoration: none; font-size: 13px;">
+                            🔍 View Full Size
+                        </a>
+                    </div>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #ff6b6b; margin-top: 12px; font-weight: normal;">
+                        <input type="checkbox" name="remove_image" value="true" id="removeImageCheckbox" onchange="toggleImageRemoval()" style="width: auto; cursor: pointer;">
+                        Remove current image
+                    </label>
+                </div>
+                <% } %>
+
+                <!-- Upload New Image -->
+                <div class="form-group" id="uploadSection">
+                    <label for="image">
+                        <%= trade.image_url ? 'Replace Image' : 'Add Screenshot / Chart Image' %>
+                    </label>
+                    <input 
+                        type="file" 
+                        id="image" 
+                        name="image"
+                        accept="image/*"
+                        onchange="previewNewImage(event)"
+                    >
+                    <div class="info-text">Upload a screenshot or chart (max 5MB, .jpg, .png, .gif)</div>
+                    
+                    <!-- New Image Preview -->
+                    <div id="newImagePreview" style="margin-top: 15px; display: none;">
+                        <p style="color: #b0b0b0; font-size: 13px; margin-bottom: 8px;">New Image Preview:</p>
+                        <img id="newPreview" src="" alt="New Preview" style="max-width: 100%; max-height: 300px; border-radius: 6px; border: 1px solid #4a9eff;">
+                        <button type="button" onclick="removeNewPreview()" style="display: block; margin-top: 10px; padding: 6px 12px; background: #2d1515; color: #ff6b6b; border: 1px solid #3d2525; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                            Cancel Upload
+                        </button>
+                    </div>
                 </div>
 
                 <div class="form-actions">
